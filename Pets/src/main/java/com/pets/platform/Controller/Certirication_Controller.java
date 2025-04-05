@@ -1,0 +1,144 @@
+package com.pets.platform.Controller;
+
+import java.io.UnsupportedEncodingException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.pets.platform.Service.UserInfo_Service;
+import com.pets.platform.certification.Certification;
+import com.pets.platform.mapper.User_Mapper;
+import com.pets.platform.redis.Redis_Service;
+
+@CrossOrigin(origins = "http://localhost:3000", allowedHeaders = "*", exposedHeaders = "Authorization")
+@RestController
+@RequestMapping("/Pets-social/certification")
+public class Certirication_Controller {
+	
+	private Logger logger = LoggerFactory.getLogger(this.getClass());
+	
+	@Autowired
+	private Certification certifies;
+	
+	@Autowired
+	private UserInfo_Service userinfo;
+	
+	@Autowired
+	private Redis_Service redis;
+	
+	@Autowired
+	private User_Mapper mapper;
+	
+	
+	@PostMapping("/sendemail")
+	public ResponseEntity<Map<String, Object>> certifi_email(@RequestBody Map<String, Object> infos){
+		Map<String,Object> response = new HashMap<String, Object>();
+		logger.info("요청 데이터 :" + infos);
+		response =certifies.sendEmail(infos); 
+		
+		if(response.get("code").equals(404)) {
+			logger.info("입력값 없음");
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+		}
+		
+		
+		return ResponseEntity.status(HttpStatus.OK).body(response);
+	}
+	
+	@PostMapping("/findpw")
+	public ResponseEntity<Map<String, Object>> findpw(@RequestBody Map<String, Object> info) {
+		logger.info("요청 파라미터 : " + info);
+		Map<String, Object> Result_Data = new HashMap<String, Object>();
+		Result_Data = userinfo.findpw(info);
+		if (Result_Data.get("resultcode").equals(400)) {
+			logger.error("인증번호 발송 실패");
+			return ResponseEntity.badRequest().body(Result_Data);
+		}
+
+		return ResponseEntity.ok().body(Result_Data);
+	}
+
+	// 인증번호 생성
+	@PostMapping("/send-sms")
+	public ResponseEntity<Map<String, Object>> user_info(@RequestBody Map<String, Object> userInfo)
+			throws InvalidKeyException, NoSuchAlgorithmException, UnsupportedEncodingException {
+		// Map<String , Object> reuslt_data = new HashMap<String, Object>();
+		logger.info("사용자 인증번호 ");
+		logger.info("인증번호 생성 파라미터: " + userInfo);
+		// Response response = new Response();
+		Map<String, Object> result_data = new HashMap<String, Object>();
+		result_data = certifies.SendMassage(userInfo);
+		logger.info("test :" + result_data);
+		if (result_data.get("resultcode").equals(400)) {
+			logger.info("중복 핸드폰 번호 ");
+			return ResponseEntity.badRequest().body(result_data);
+		}
+
+		return ResponseEntity.ok().body(result_data);
+	}
+	
+    //비밀번호 리셋
+	@PostMapping("/resetpw")
+	public ResponseEntity<Map<String, Object>> reset(@RequestBody Map<String, Object> info) {
+		logger.info("비밀번호 초기화");
+		Map<String, Object> result_data = new HashMap<String, Object>();
+		result_data = userinfo.reset_password(info);
+		return ResponseEntity.ok().body(result_data);
+	}
+
+	// 비밀번호 리셋을 위한 인증번호 api
+	@PostMapping("/reset-pass")
+	public ResponseEntity<Map<String, Object>> re_password(@RequestBody Map<String, Object> reset)
+			throws InvalidKeyException, NoSuchAlgorithmException, UnsupportedEncodingException {
+
+		logger.info("인증번호 조회");
+		logger.info("조회 데이터 : " + reset);
+		Map<String, Object> result_data = new HashMap<String, Object>();
+		result_data = redis.getData(reset);
+		logger.info("result :" + result_data);
+
+		if (result_data.get("resultCode").equals(400)) {
+			logger.error("인증번호가 다릅니다");
+			return ResponseEntity.badRequest().body(result_data);
+		}
+		String id = "";
+		id = reset.get("phonnumber").toString();
+		id = mapper.user_id(id);
+		result_data.put("id", id);
+		return ResponseEntity.ok().body(result_data);
+	}
+
+	// 인증번호 확인
+	@PostMapping("/verifi-sms")
+	public ResponseEntity<Map<String, Object>> verification_sms(@RequestBody Map<String, Object> check_info)
+			throws InvalidKeyException, NoSuchAlgorithmException, UnsupportedEncodingException {
+
+		logger.info("인증번호 조회");
+		logger.info("조회 데이터 : " + check_info);
+		Map<String, Object> result_data = new HashMap<String, Object>();
+		result_data = redis.getData(check_info);
+		logger.info("result :" + result_data);
+
+		if (result_data.get("resultCode").equals(400)) {
+			logger.error("인증번호가 다릅니다");
+			return ResponseEntity.badRequest().body(result_data);
+		}
+
+		return ResponseEntity.ok().body(result_data);
+	}
+	
+	
+
+}

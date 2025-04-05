@@ -1,0 +1,103 @@
+package com.pets.platform.redis;
+
+import java.time.Duration;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.boot.autoconfigure.data.redis.*;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+
+@Service
+public class Redis_Service {
+
+	private Logger logger = LoggerFactory.getLogger(this.getClass());
+
+    private final int LIMIT_TIME = 3*60;
+    
+    @Autowired
+    private RedisTemplate<String ,Object> redisTemplate;
+
+    public void setData(String key, String value,Long expiredTime){
+    	logger.info("redis set value");
+    	logger.info("key : "+ key + " , " + "value : " + value);
+    	logger.info("test:" +redisTemplate.getConnectionFactory());
+        final ValueOperations<String, Object> valueOperations = redisTemplate.opsForValue();
+        if(key.equals("refresh_token")) {
+        	logger.info("refresh_token redis 저장");
+        	valueOperations.set(key, value , Duration.ofMillis(expiredTime));
+            final String KEY_VALUE = (String) valueOperations.get(key);
+            logger.info("get : " + KEY_VALUE);
+        	return;
+        	
+        }
+        valueOperations.set(key, value , Duration.ofMillis(LIMIT_TIME));
+        
+        final String KEY_VALUE = (String) valueOperations.get(key);
+        logger.info("get : " + KEY_VALUE);
+        return;
+    }
+    public void setrefresh(String key, String value,Long expiredTime){
+    	logger.info("redis set value");
+    	logger.info("key : "+ key + " , " + "value : " + value);
+    	logger.info("test:" +redisTemplate.getConnectionFactory());
+        final ValueOperations<String, Object> valueOperations = redisTemplate.opsForValue();
+        valueOperations.set(key, value , Duration.ofMillis(expiredTime));
+        
+        final String KEY_VALUE = (String) valueOperations.get(key);
+        logger.info("get : " + KEY_VALUE);
+        return;
+    }
+    
+    public String check_refresh(String id) {
+    	logger.info("리프래쉬 토큰 조회");
+    	String Respons_data = "";
+    	Respons_data = (String) redisTemplate.opsForValue().get(id);
+    	logger.info("리프래쉬 결과값 :" + Respons_data);
+    	
+    	return Respons_data;
+    }
+
+    public Map<String, Object> getData(Map<String, Object> certification_info){
+    	logger.info("redis key 조회 " );
+    	Map<String, Object> result_data = new HashMap<String, Object>();
+    	
+    	String Respons_data = "";
+    	Respons_data = (String) redisTemplate.opsForValue().get(certification_info.get("phonnumber").toString());
+    	logger.info("인증번호 : " + Respons_data);
+    	logger.info("전송돠된 인증번호 : " + certification_info.get("certifi_number").toString());
+    	boolean value_check = false;
+    	
+    	
+    	if(Respons_data.equals("")) {
+    		logger.info("redis의 저장된 값을 찾을 수 없습니다 ");
+    	    result_data.put("resultCode", 400);
+    	    result_data.put("resultMsg", "인증번호 불일치");
+    	}
+    	else {
+    		
+    		if(certification_info.get("certifi_number").equals(Respons_data)) {
+    	    logger.info("인증번호 확인");
+    	    result_data.put("resultCode", 200);
+    	    result_data.put("resultMsg", "인증번호 일치");
+    	    redisTemplate.delete(certification_info.get("phonnumber").toString());
+    		}
+    		else {
+        	    logger.info("인증번호가 다릅니다");
+        	    result_data.put("resultCode", 400);
+        	    result_data.put("resultMsg", "인증번호 불일치");
+    		}
+    	}
+        return result_data;
+    }
+
+    public void deleteData(String key){
+        redisTemplate.delete(key);
+    }
+
+}

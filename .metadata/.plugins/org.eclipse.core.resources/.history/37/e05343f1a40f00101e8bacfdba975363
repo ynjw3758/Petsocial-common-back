@@ -1,0 +1,23 @@
+package com.pets.platform.certification;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+@Service
+public class Naver_Certification {
+	
+	
+	private Logger logger = LoggerFactory.getLogger(this.getClass());
+	
+	@Value("${naver.client.id}")
+	public String client_id;
+	
+	@Value("${naver.redirect.url}")
+	public String redirect_url;
+	
+	@Value("${naver.client-secret}")
+	public String seckret_key;
+
+}

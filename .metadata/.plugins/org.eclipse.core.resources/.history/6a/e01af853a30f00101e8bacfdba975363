@@ -1,0 +1,8 @@
+package com.pets.platform.certification;
+
+import org.springframework.stereotype.Service;
+
+@Service
+public class Naver_Certification {
+
+}

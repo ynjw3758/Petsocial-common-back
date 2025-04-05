@@ -1,0 +1,289 @@
+package com.pets.platform.Controller;
+
+import java.io.File;
+
+
+
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+
+//import org.apache.commons.io.FilenameUtils;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseEntity;
+import org.springframework.kafka.support.SendResult;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pets.platform.certification.Certification;
+import com.pets.platform.certification.Kakao_Certification;
+import com.pets.platform.dto.Response;
+import com.pets.platform.jwt.TokenProvider;
+//import com.pets.platform.kafka.Kafka_service;
+import com.pets.platform.mapper.User_Mapper;
+import com.pets.platform.redis.Redis_Service;
+import com.pets.platform.Service.Content_Service;
+import com.pets.platform.Service.Main_Service;
+import com.pets.platform.Service.UserInfo_Service;
+
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+@CrossOrigin(origins = "http://localhost:3000", allowedHeaders = "*", exposedHeaders = "Authorization")
+@RestController
+@RequestMapping("/Pets-social")
+public class Common_Controller {
+
+	private Logger logger = LoggerFactory.getLogger(this.getClass());
+
+	@Autowired
+	private Certification certifies;
+
+	@Autowired
+	private UserInfo_Service userinfo;
+
+	@Autowired
+	private Redis_Service redis;
+
+	@Autowired
+	private User_Mapper mapper;
+
+	@Autowired
+	private TokenProvider token;
+
+	@Autowired
+	private Kakao_Certification kakao;
+
+	@Autowired
+	private Main_Service Main;
+	
+
+
+    //로그인 후 메인 페이지 렌더링 시 mongodb에 저장되어있는 이미지 및 동영상 파일 가져오기
+	@GetMapping("/refresh-main")
+	public ResponseEntity<Map<String, Object>> Main_refresh(@RequestParam("Id") String id) {
+		logger.info("메인 페이지 리로딩");
+		Map<String, Object> result_data = new HashMap<String, Object>();
+		logger.info("test : " + id);
+		result_data = Main.Mainpage_refresh( id);
+		
+		if(result_data.get("resultcode").equals(201)) {
+			
+			return ResponseEntity.status(HttpStatus.CREATED).body(result_data);
+		}
+
+		return ResponseEntity.status(HttpStatus.OK).body(result_data);
+	}
+	
+	
+	@GetMapping("/MatList")
+	public ResponseEntity<Map<String, Object>> MatList(@RequestParam("Id") String id){
+		Map<String, Object> response = new HashMap<String, Object>();
+		response =userinfo.freindly_list(id); 
+		logger.info("결과 값 : " + response);
+		return ResponseEntity.status(HttpStatus.OK).body(response);
+	}
+	
+	
+	@PostMapping("/follower")
+	public ResponseEntity<Map<String , Object>> follower(HttpServletRequest request ,
+			@RequestBody Map<String ,Object> info){
+		logger.info("팔로워 정보 :"+ info);
+		ResponseEntity<Map<String, Object>> check_token;
+		Map<String, Object> result =new HashMap<String, Object>();
+			check_token =token.access_check(request);
+			logger.info("토큰 결과 :" + check_token.getStatusCode());
+			if(check_token.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+				logger.info("토큰 시간 만료");
+				result.put("resultcode", 401);
+				result.put("resultmsg", "token is finished");
+				return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+			}
+			logger.info("토큰 인증 완료");
+			result = userinfo.follower(info);
+		
+		
+		return ResponseEntity.status(HttpStatus.OK).body(result);
+	}
+	
+	
+
+	
+	@GetMapping("/Smallprofile")
+	public ResponseEntity<Map<String, Object>> small_profile(HttpServletRequest request, 
+			@RequestParam("Myid") String myid,
+			@RequestParam("Userid") String Userid){
+		Map<String, Object> result = new HashMap<String, Object>();
+		result =Main.Small_Profile(myid,  Userid); 
+		
+		
+		return ResponseEntity.status(HttpStatus.OK).body(result);
+	}
+	
+	@GetMapping("/SearchProfile")
+	public ResponseEntity<Map<String, Object>>Mypage(HttpServletRequest request, 
+			@RequestParam("Id") String id,
+			@RequestParam("type") String type,
+			@RequestParam("Userid") String Userid){
+		
+		Map<String, Object> result = new HashMap<String, Object>();
+		ResponseEntity<Map<String, Object>> check_token;
+			check_token =token.access_check(request);
+			logger.info("토큰 결과 :" + check_token.getStatusCode());
+			if(check_token.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+				logger.info("토큰 시간 만료");
+				result.put("resultcode", 401);
+				result.put("resultmsg", "token is finished");
+				return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+			}
+			logger.info("토큰 인증 완료");
+		result = Main.Profile(id , type, Userid);
+		
+		return ResponseEntity.status(HttpStatus.OK).body(result);
+	}
+
+	/*
+	@PostMapping("/Fileupload")
+	public ResponseEntity<Map<String, Object>> File_Upload(HttpServletRequest request,
+			@RequestParam("UploadFile") List<MultipartFile> uploadFile ,
+			@RequestParam("text") String text,
+			@RequestParam("location") String location_info,
+			@RequestParam("opendkind") String opend_info
+			){
+
+		Map<String, Object> response =new HashMap<String, Object>();
+		
+		CompletableFuture<SendResult<String, Object>> future = new CompletableFuture<SendResult<String, Object>>();
+        if(!location_info.equals("[]")) {
+        	logger.info("위치 정보 존재");
+        ObjectMapper mapper =new ObjectMapper();
+        Map<String, Object> ListToMap =new HashMap<String, Object>();
+        
+		try {
+			ListToMap= mapper.readValue(location_info, Map.class);
+			logger.info("list to json :" + ListToMap.get("position"));
+		} catch (JsonMappingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			logger.error("에러 발생");
+		} catch (JsonProcessingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		response = upload.upload(ListToMap, uploadFile , request ,text , opend_info);
+		logger.info("test1 :" + response);
+		
+        }
+        else {
+        	logger.info("위치 정보 없음");
+        	
+        	response = upload.upload(null, uploadFile , request ,text , opend_info);
+        	
+        	logger.info("test2 :" + future);
+        }
+        
+        logger.info("업로드 결과 :" + response);
+         return ResponseEntity.status(HttpStatus.OK).body(response);
+	}
+	*/
+
+    //아이디 찾기
+	@PostMapping("/findId")
+	public ResponseEntity<Map<String, Object>> findid(@RequestBody Map<String, Object> info) {
+		logger.info("사용자 id 찾기 ");
+		logger.info("사용자 id 정보 : " + info);
+		Map<String, Object> resuslt_data = new HashMap<String, Object>();
+		resuslt_data = userinfo.findid(info);
+
+		return ResponseEntity.ok().body(resuslt_data);
+	}
+
+	// 회원가입 완료
+	@PostMapping("/sign")
+	public ResponseEntity<Map<String, Object>> sign(@RequestBody Map<String, Object> user_info) {
+		logger.info("회원가입 진행");
+		Map<String, Object> result_data = new HashMap<String, Object>();
+		logger.info("요청받은 데이터 : " + user_info);
+		result_data = userinfo.receive_info(user_info);
+		logger.info("결과 :" + result_data);
+
+		return ResponseEntity.ok().body(result_data);
+	}
+
+
+	
+	
+	@GetMapping("/dupl-email")
+	public ResponseEntity<Map<String ,Object>> dupl_Eamil(@RequestParam("email") String email){
+		Map<String, Object> result_data = new HashMap<String, Object>();
+		logger.info("email :"+email);
+		result_data = userinfo.check_email(email);
+		logger.info("결과 : " + result_data);
+		if (result_data.get("resultCode").equals(400)) {
+			logger.info("중복 확인");
+			return ResponseEntity.badRequest().body(result_data);
+		}
+		return ResponseEntity.ok().body(result_data);
+	}
+
+	//중복 아이디
+	@GetMapping("/dupl-id")
+	public ResponseEntity<Map<String, Object>> duplicate_id(@RequestParam("id") String id) {
+		Map<String, Object> result_data = new HashMap<String, Object>();
+		result_data = userinfo.check_id(id);
+		logger.info("결과 : " + result_data);
+		if (result_data.get("resultCode").equals(400)) {
+			logger.info("중복 확인");
+			return ResponseEntity.badRequest().body(result_data);
+		}
+
+		return ResponseEntity.ok().body(result_data);
+	}
+
+	//중복 닉네임
+	@GetMapping("/dupl-nick")
+	public ResponseEntity<Map<String, Object>> duplicate_nickname(@RequestParam("nickname") String name) {
+		Map<String, Object> result_data = new HashMap<String, Object>();
+		logger.info("요청 데이터 :" + name);
+		result_data = userinfo.check_nickname(name);
+		logger.info("결과 : " + result_data);
+		if (result_data.get("resultCode").equals(400)) {
+			logger.info("중복 확인");
+			return ResponseEntity.badRequest().body(result_data);
+		}
+
+		return ResponseEntity.ok().body(result_data);
+
+	}
+
+}

@@ -1,0 +1,141 @@
+package com.pets.platform.certification;
+
+import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pets.platform.exception.RestemplateExceptionHandler;
+import com.pets.platform.mapper.User_Mapper;
+
+import jakarta.servlet.http.HttpServletRequest;
+
+@Service
+public class Naver_Certification {
+	
+	
+	private Logger logger = LoggerFactory.getLogger(this.getClass());
+	
+	@Value("${naver.client-id}")
+	public String client_id;
+	
+	@Value("${naver.redirect-url}")
+	public String redirect_url;
+	
+	@Value("${naver.client-secret}")
+	public String seckret_key;
+	
+	@Autowired
+	private RestTemplate restemplate;
+	
+	@Autowired
+	private User_Mapper mapper;
+	
+	public Map<String, Object> Naver_Login(String code , HttpServletRequest tokens ,String state){
+		logger.info("code :" + code);
+		logger.info("state :" + state);
+		Map<String ,Object> result = new HashMap<String, Object>();
+		String apiurl="https://nid.naver.com/";
+		String path = "oauth2.0/token";
+		URI url = null;
+		url = UriComponentsBuilder.fromUriString(apiurl).path(path).encode().build().toUri();
+		HttpHeaders header = new HttpHeaders();
+		header.add("Content-type", "application/x-www-form-urlencoded;charset=utf-8");
+		logger.info("클라이언트 아이디 :" + client_id);
+		MultiValueMap<String ,String>param = new LinkedMultiValueMap<String, String>();
+		param.add("grant_type", "authorization_code");
+		param.add("client_id", client_id);
+		param.add("client_secret", seckret_key);
+		param.add("redirect_uri", redirect_url);
+		param.add("code", code);
+		param.add("state", state);
+		
+		HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(param, header);
+		ResponseEntity<String> respondatas = restemplate.exchange(url, HttpMethod.POST, request, String.class);
+		Map<String ,Object> json = new HashMap<String, Object>();
+		Map<String ,Object> User_info = new HashMap<String, Object>();
+		if(respondatas.getStatusCodeValue() ==200) {
+			
+			try {
+				json = new ObjectMapper().readValue(respondatas.getBody().toString(), Map.class);
+				logger.info("카카오 사용자 정보 조회: " + json);
+			} catch (JsonMappingException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (JsonProcessingException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			String access_token = json.get("access_token").toString();
+			User_info = GetUser_info(access_token);
+			
+			
+		}
+		else {
+			logger.error("요청 값이 이상한 경우");
+			result.put("code", 401);
+			result.put("msg", "login_fail");
+			result.put("data", "null");
+		}
+		//String access_token = 
+		
+		return result;
+		
+	}
+	
+	public Map<String ,Object> GetUser_info(String token){
+		
+		Map<String ,Object> data = new HashMap<String, Object>();
+		String apiurl="https://openapi.naver.com/";
+		String path = "v1/nid/me";
+		URI url = null;
+		url = UriComponentsBuilder.fromUriString(apiurl).path(path).encode().build().toUri();
+		HttpHeaders header = new HttpHeaders();
+		header.add("Content-type", "application/x-www-form-urlencoded;charset=utf-8");
+		header.add("Authorization", "Bearer " + token);
+		logger.info("헤더 : " + header);
+		restemplate.setErrorHandler(new RestemplateExceptionHandler());// Http통신 예외 처리
+		
+		MultiValueMap<String ,String>param = new LinkedMultiValueMap<String, String>();
+		HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(header);
+		ResponseEntity<String> respondatas = restemplate.exchange(url, HttpMethod.GET, request, String.class);
+		logger.info("respondata : " + respondatas);
+		JSONObject json = new JSONObject();
+		Map<String ,Object> properties = new HashMap<String ,Object>();
+		if(respondatas.getStatusCodeValue()==200) {
+			Map<String, Object> user_info = new HashMap<String ,Object>();
+		logger.info("사용자 정보 조회 성공");
+		try {
+			user_info = new ObjectMapper().readValue(respondatas.getBody().toString(), Map.class);
+		} catch (JsonMappingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (JsonProcessingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		logger.info("정보 :" + user_info);
+		}
+		
+				
+	 return data;	
+	}
+
+}

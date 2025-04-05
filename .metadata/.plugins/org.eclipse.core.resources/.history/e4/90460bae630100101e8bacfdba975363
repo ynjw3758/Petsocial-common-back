@@ -1,0 +1,5 @@
+package com.pets.platform.config;
+
+public class SendMail {
+
+}

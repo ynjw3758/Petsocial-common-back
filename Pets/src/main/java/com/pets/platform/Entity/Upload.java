@@ -1,0 +1,96 @@
+package com.pets.platform.Entity;
+
+import java.util.List;
+
+
+import java.util.Map;
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import com.pets.platform.dto.File_info;
+import com.pets.platform.dto.Local_info;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Data
+@Getter
+@Document(collection = "upload")
+@NoArgsConstructor
+@AllArgsConstructor
+public class Upload {
+
+	//@Id
+	private String id;
+	private String text;
+	private List<Map<String, Object>> file_info;
+	private List<Map<String, Object>> local_info;
+	private String create;
+	private String user;
+	
+	public String getUser() {
+		return user;
+	}
+	
+	public void setUser(String user) {
+		this.user=user;
+	}
+	public String getId() {
+		return id;
+	}
+	public void SetId(String id) {
+		this.id = id;
+	}
+	
+	
+	public String getCreate() {
+		return create;
+	}
+	
+	public void setCreate(String create) {
+		this.create = create;
+	}
+	
+	public List<Map<String, Object>> getFileinfo(){
+		return file_info;
+	}
+	
+	public void setFileinfo(List<Map<String, Object>> file_info) {
+		this.file_info = file_info;
+	}
+	/*
+	public List<Map<String, Object>> getLocalinfo(){
+		return local_info;
+	}
+	public void setLocalinfo(List<Map<String, Object>> local_info){
+		this.local_info = local_info;
+	}
+	*/
+	/*
+	public String getUser() {
+		return user;
+	}
+	public void setUser(String user) {
+		this.user = user;
+	}
+	*/	
+	public String getText() {
+		return text;
+	}
+	
+	public void setText(String text) {
+		this.text = text;
+	}
+	
+
+	
+	 @Override
+	    public String toString() {
+	        return "file_info :" + file_info + " ,local_info:" + local_info + " ,text:" + text + "userid :" + user
+	        		+ " ,create :" + create;
+	    } 
+
+}

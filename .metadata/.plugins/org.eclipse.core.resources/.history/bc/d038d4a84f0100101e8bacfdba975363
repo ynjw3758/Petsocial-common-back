@@ -1,0 +1,54 @@
+package com.pets.platform.mapper;
+
+import java.util.List;
+import java.util.Map;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.springframework.stereotype.Repository;
+
+@Mapper
+@Repository
+public interface User_Mapper {
+	/*-------회원 가입 db저장-----*/
+	public void Sign_insert(Map<String, Object> userinfo);
+	
+	/*------카카오 로그인--------*/
+	public void kakao_insert(Map<String , Object> info);
+	public boolean Check_id(String id);
+	public Map<String ,Object> user_info(String id);
+	
+	/*-----닉네임 중복 , 중복 아이디 ,핸드폰 인증 확인------*/
+	public boolean Search_Nickname(String Nickname);
+	public boolean Search_Phone(String Phone_number);
+	public boolean Search_Id(String Id);
+	public boolean Search_email(String Email);
+	
+	/*---연동 캔슬 업데이트---*/
+	public void dtlink(String email);
+	
+	/*--- 팔로워 추가 및 취소----*/
+	public void Follower_connect(Map<String , Object> info);
+	public void Folloer_cancel(Map<String , Object> info);
+	
+	
+	/*--- 닉네임으로 id찾기----*/
+	public Map<String, Object> friendfind(/*String nickname , String myid*/ Map<String, Object> loginfo);
+	
+	
+	/*---연동할 id 가져오기----*/
+	public String search_Linked_id(String Name, String Email);
+	public Map<String, Object> Kakao_Search_id(String Email);
+	
+   /*---비밀번호 아이디 가져오기-----*/
+	public Map<String, Object> search_pass_id(Map<String, Object> loginfo);
+	
+	/*----사용자 id/pw 찾기----*/
+	public Map<String, Object> findId(Map<String, Object> info);
+	
+	/*------맞팔로워 리스트 조회----*/
+	public List<Map<String, Object>> Matfalow_List(String Id);
+	
+	
+	public String user_id(String Phone_number);
+	public void reset_password(Map<String ,Object> info);//비밀번호 변경
+}

@@ -1,0 +1,72 @@
+package com.pets.platform.certification;
+
+import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import com.pets.platform.mapper.User_Mapper;
+
+import jakarta.servlet.http.HttpServletRequest;
+
+@Service
+public class Naver_Certification {
+	
+	
+	private Logger logger = LoggerFactory.getLogger(this.getClass());
+	
+	@Value("${naver.client.id}")
+	public String client_id;
+	
+	@Value("${naver.redirect.url}")
+	public String redirect_url;
+	
+	@Value("${naver.client-secret}")
+	public String seckret_key;
+	
+	@Autowired
+	private RestTemplate restemplate;
+	
+	@Autowired
+	private User_Mapper mapper;
+	
+	public Map<String, Object> Naver_Login(String code , HttpServletRequest tokens ,String state){
+		
+		Map<String ,Object> result = new HashMap<String, Object>();
+		String apiurl="https://kauth.kakao.com/";
+		String path = "oauth/token";
+		URI url = null;
+		url = UriComponentsBuilder.fromUriString(apiurl).path(path).encode().build().toUri();
+		HttpHeaders header = new HttpHeaders();
+		header.add("Content-type", "application/x-www-form-urlencoded;charset=utf-8");
+		
+		MultiValueMap<String ,String>param = new LinkedMultiValueMap<String, String>();
+		param.add("grant_type", "authorization_code");
+		param.add("client_id", client_id);
+		param.add("redirect_uri", redirect_url);
+		param.add("code", code);
+		param.add("state", state);
+		
+		HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(param, header);
+		ResponseEntity<String> respondatas = restemplate.exchange(url, HttpMethod.POST, request, String.class);
+		logger.info("respondata : " + respondatas.getBody());
+		//String access_token = 
+		
+		return result;
+		
+	}
+
+}
