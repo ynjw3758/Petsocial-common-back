@@ -22,6 +22,10 @@ public class Redis_Service {
     
     @Autowired
     private RedisTemplate<String ,Object> redisTemplate;
+    
+    public void Delete_Refresh_token(String id) {
+    	redisTemplate.delete("refresh_token:" + id);
+    }
 
     public void setData(String key, String value,Long expiredTime){
     	logger.info("redis set value");

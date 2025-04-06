@@ -29,6 +29,7 @@ import com.pets.platform.mapper.Setting_Mapper;
 import com.pets.platform.mapper.User_Mapper;
 
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 
 
 
@@ -51,6 +52,14 @@ public class UserInfo_Service {
     
     @Autowired
     private Certification certifi;
+    
+    public Map<String, Object> update_nickname(Map<String, Object> info ,HttpServletRequest request){
+    	Map<String, Object> response = new HashMap<>();
+    	
+    	
+    	return response;
+    	
+    }
     
     public Map<String, Object> follower(Map<String, Object> info){
     	
@@ -163,8 +172,8 @@ public class UserInfo_Service {
 		
 		if(log_data == null) {
 			logger.info("아이디가 존재하지않습니다");
-			result_data.put("resultCode", 400);
-			result_data.put("resultMsg", "아이디 및 패스워드가 존재하지않습니다");
+			result_data.put("codeode", 400);
+			result_data.put("msg", "아이디 및 패스워드가 존재하지않습니다");
 			return result_data;
 		}
 		
@@ -175,20 +184,20 @@ public class UserInfo_Service {
 			tokeninfo = Token.CreateToken(info.get("id").toString());
 			logger.info("토큰 결과  : " + tokeninfo);
 			
-			
-			result_data.put("resultCode", 200);
-			result_data.put("resultMsg", "로그인 성공 ");
-			result_data.put("id", log_data.get("id").toString());
-			result_data.put("NickName", log_data.get("nickname").toString());
-			result_data.put("access_token", tokeninfo.get("access_token").toString());
-			result_data.put("refresh_token", tokeninfo.get("refresh_token").toString());
-			//result_data.put("Cookie", tokeninfo.get("Cookie").toString());
-			result_data.put("exp", tokeninfo.get("exp").toString());
+			Map<String, Object> data = new HashMap<>();
+			data.put("id", log_data.get("id").toString());
+			data.put("NickName", log_data.get("nickname").toString());
+			data.put("access_token", tokeninfo.get("access_token").toString());
+			data.put("refresh_token", tokeninfo.get("refresh_token").toString());
+			data.put("exp", tokeninfo.get("exp").toString());
+			result_data.put("code", 200);
+			result_data.put("msg", "로그인 성공 ");
+			result_data.put("data", data);
 		}
 		else {
 			logger.info("비밀번호 불일치 ");
-			result_data.put("resultCode", 400);
-			result_data.put("resultMsg", "아이디 및 패스워드가 존재하지않습니다");
+			result_data.put("code", 400);
+			result_data.put("msg", "아이디 및 패스워드가 존재하지않습니다");
 		}
 
 		

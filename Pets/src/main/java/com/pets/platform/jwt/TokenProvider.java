@@ -38,11 +38,12 @@ public class TokenProvider {
 	    @Autowired
 	     private Redis_Service Redis;
 	    
-	    //access_token만 생성
-	    public String EmailReset_password_access(String id) {
+	    public Map<String ,Object> create_access(String id) {
 			   Date create_time =new Date();
 			   Date expiration =  new Date(create_time.getTime() + Duration.ofDays(1).toMillis());
-			   long finish_time =10 * 60 * 1000;;
+			   long finish_time = 1000*60*10*6;
+			   Map<String, Object> data= new HashMap<>();
+			   Map<String , Object> payload_info = new HashMap<String, Object>();
 			   
 	           String access_Token = "";
 	           access_Token = Jwts.builder()
@@ -50,13 +51,18 @@ public class TokenProvider {
 		                .claim("userid", id)
 		                .setIssuer(id) // 토큰발급자(iss)
 		                .setIssuedAt(create_time) // 발급시간(iat)
-		                .setExpiration(new Date(System.currentTimeMillis() + finish_time))
+		                .setExpiration(new Date(create_time.getTime()+finish_time))
 		                .setSubject(id) //  토큰 제목(subject)
 		                .signWith(SignatureAlgorithm.HS256, Base64.getEncoder().encodeToString(secretKey.getBytes())) // 알고리즘, 시크릿 키
 		                .compact();
+	           
+	           payload_info = Jwts.parser().setSigningKey(secretKey.getBytes()).parseClaimsJws(access_Token).getBody();
+	           data.put("access_token", access_Token);
+	           data.put("exp", payload_info.get("exp").toString());
 	    	
-	    	return access_Token;
+	    	return data;
 	    }
+
 	    
 	    //access_token만 생성
 	    public String on_access(String id) {
@@ -85,9 +91,9 @@ public class TokenProvider {
 		   Date expiration =  new Date(create_time.getTime() + Duration.ofDays(1).toMillis());
 		   long time = 1000*60*24;
 		   long finish_time = 1000*60*60;
-		   long refresh_time=1000*60*60*24;
+		   long refresh_time=1000L*60*60*24*30; //리프레쉬 토큰 30일
 		   Map<String, Object> tokeninfo = new HashMap<String, Object>();
-		   
+		   logger.info("타임 :" + refresh_time);
         String access_Token = "";
         access_Token = Jwts.builder()
 	                .setHeaderParam(Header.TYPE, Header.JWT_TYPE) // (1)
@@ -137,7 +143,20 @@ public class TokenProvider {
 	            logger.error("엑세스 토큰 시간이 만료되었습니다");
 	            return false;
 	        }
-	    }   
+	    }
+	   public boolean refresh_validate(String token, String id) {
+		   logger.info("refresh_token 체크 : " + token);
+		   logger.info("id : " + id);
+	        try {
+	            Jwts.parser().setSigningKey(secretKey.getBytes()).parseClaimsJws(token);
+	            return true;
+	        
+	        } catch(ExpiredJwtException e) {
+	            logger.error("refresh_token 시간이 만료되었습니다");
+	            Redis.Delete_Refresh_token(id);
+	            return false;
+	        }
+	    }  
 	   
 	   //엑세스 토큰 조회 통합 메소드 
 	   public ResponseEntity<Map<String ,Object>> access_check(HttpServletRequest request) {
@@ -169,9 +188,6 @@ public class TokenProvider {
 		   Map<String , Object> payload_info = new HashMap<String, Object>();
 		   logger.info("사용자id :" + id + " , " + "token :" + Token);
 		   payload_info = Jwts.parser().setSigningKey(secretKey.getBytes()).parseClaimsJws(Token).getBody();
-		   logger.info("paload : " + payload_info);
-		   //payload_info.put("data", Jwts.parser().setSigningKey(secretKey.getBytes()).parseClaimsJws(Token).getBody());
-		   logger.info("aaaa: " +payload_info.get("userid").toString());
 		   if(payload_info.get("userid").toString().equals(id)) {
 			   logger.info("payload 인증 완료");
 			   result_data.put("resultcode", 200);

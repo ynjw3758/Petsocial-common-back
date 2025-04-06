@@ -79,7 +79,17 @@ public class Common_Controller {
 	@Autowired
 	private Main_Service Main;
 	
-
+	
+	
+	
+   @PostMapping("/chang-nick")
+   public ResponseEntity<Map<String, Object>>update_nickname(@RequestBody Map<String ,Object> infos,
+		   HttpServletRequest request){
+	   Map<String, Object> result= new HashMap<>();
+	   
+	   result =userinfo.update_nickname(infos, request); 
+	   return ResponseEntity.status(HttpStatus.OK).body(result);
+   }
 
     //로그인 후 메인 페이지 렌더링 시 mongodb에 저장되어있는 이미지 및 동영상 파일 가져오기
 	@GetMapping("/refresh-main")

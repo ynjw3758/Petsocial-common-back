@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,7 +26,7 @@ import com.pets.platform.certification.Naver_Certification;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-@CrossOrigin(origins = "http://localhost:3000", allowedHeaders = "*", exposedHeaders = "Authorization")
+@CrossOrigin(origins = "http://localhost:3000", allowedHeaders = "*", exposedHeaders = "Authorization" ,allowCredentials = "true")
 @RestController
 @RequestMapping("/Pets-social")
 public class Login_Controller {
@@ -73,16 +74,28 @@ public class Login_Controller {
 		Map<String, Object> result_data = new HashMap<String, Object>();
 		result_data = userinfo.Login(login_info);
 		logger.info("로그인 결과: " + result_data);
-		if (result_data.get("resultCode").equals(400)) {
+		if (result_data.get("code").equals(400)) {
 			logger.info("로그인 실패");
 			return ResponseEntity.badRequest().body(result_data);
 		}
 		HttpHeaders headers = new HttpHeaders();
-		headers.add(HttpHeaders.COOKIE, result_data.get("refresh_token").toString());
-		response.setHeader("Authorization", result_data.get("refresh_token").toString());
-		// response.setHeader("set-cookie", result_data.get("Cookie").toString());
-		result_data.remove("Cookie");
-		return ResponseEntity.ok()/* .headers(headers) */.body(result_data);
+		JSONObject res_data = new JSONObject(result_data);
+		logger.info("data : " + res_data.get("data"));
+		JSONObject ACCESS_TOKEN = new JSONObject(res_data.get("data").toString());
+		logger.info("access : " + ACCESS_TOKEN.get("access_token").toString());
+
+		response.addHeader("Authorization", ACCESS_TOKEN.get("access_token").toString());
+		
+	    ResponseCookie refreshTokenCookie = ResponseCookie.from("refresh_token", ACCESS_TOKEN.get("refresh_token").toString())
+	            .httpOnly(false)
+	            .secure(false) // HTTPS 환경에서만 사용할 경우
+	            .path("/")
+	            .maxAge(30 * 24 * 60 * 60) // 7일
+	            .sameSite("Strict") // 또는 "Lax"
+	            .build();
+
+	    response.addHeader("Set-Cookie", refreshTokenCookie.toString());
+	    return ResponseEntity.status(HttpStatus.OK).body(result_data);
 	}
 	
 	@PostMapping("/oauth/create")
@@ -104,8 +117,58 @@ public class Login_Controller {
 			HttpServletRequest requests) {
 		Map<String, Object> result_data = new HashMap<String, Object>();
 		result_data =naver.Naver_Login(code, requests ,state);
+		if (result_data.get("code").equals(401)) {
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(result_data);
+		}
+		else if (result_data.get("code").equals(201)) {
+			logger.info("신규 회원 로그인 성공");
+			JSONObject res_data = new JSONObject(result_data);
+			logger.info("data : " + res_data.get("data"));
+			JSONObject ACCESS_TOKEN = new JSONObject(res_data.get("data").toString());
+			logger.info("access : " + ACCESS_TOKEN.get("access_token").toString());
+
+			response.addHeader("Authorization", ACCESS_TOKEN.get("access_token").toString());
+		    // ✅ refresh_token을 HttpOnly 쿠키로 설정
+		    ResponseCookie refreshTokenCookie = ResponseCookie.from("refresh_token", ACCESS_TOKEN.get("refresh_token").toString())
+		            .httpOnly(false)
+		            .secure(false) // HTTPS 환경에서만 사용할 경우
+		            .path("/")
+		            .maxAge(30 * 24 * 60 * 60) // 7일
+		            .sameSite("Strict") // 또는 "Lax"
+		            .build();
+
+		    response.addHeader("Set-Cookie", refreshTokenCookie.toString());
+
+			return ResponseEntity.status(HttpStatus.CREATED).body(result_data);
+		}
 		
+		else if(result_data.get("code").equals(301)) {
+			logger.info("기존 계정 존재한다.");
+			return ResponseEntity.status(HttpStatus.MOVED_PERMANENTLY).body(result_data);
+		}	
+		logger.info("최종 로그인 정보 :" + result_data);
 		
+		if(result_data.get("code").equals(200) && result_data.get("Customcode").equals("01")) {
+			JSONObject res_data = new JSONObject(result_data);
+			logger.info("data : " + res_data.get("data"));
+			JSONObject ACCESS_TOKEN = new JSONObject(res_data.get("data").toString());
+			logger.info("access : " + ACCESS_TOKEN.get("access_token").toString());
+
+			response.addHeader("Authorization", ACCESS_TOKEN.get("access_token").toString());
+		    // ✅ refresh_token을 HttpOnly 쿠키로 설정
+		    ResponseCookie refreshTokenCookie = ResponseCookie.from("refresh_token", ACCESS_TOKEN.get("refresh_token").toString())
+		            .httpOnly(false)
+		            .secure(false) // HTTPS 환경에서만 사용할 경우
+		            .path("/")
+		            .maxAge(30 * 24 * 60 * 60) // 30일
+		            .sameSite("Strict") // 또는 "Lax"
+		            .build();
+
+		    response.addHeader("Set-Cookie", refreshTokenCookie.toString());
+
+			return ResponseEntity.status(HttpStatus.OK).body(result_data);
+			
+		}
 		return ResponseEntity.status(HttpStatus.OK).body(result_data);
 	}
 	
@@ -117,28 +180,54 @@ public class Login_Controller {
 		logger.info("code : " + code);
 		result_data = kakao.kakao_login(code, requests);
 		logger.info("결과값 : " + result_data);
-		if (result_data.get("resultcode").equals(401)) {
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+		if (result_data.get("code").equals(401)) {
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(result_data);
 		}
-		if (result_data.get("resultcode").equals(201)) {
+		else if (result_data.get("code").equals(201)) {
 			logger.info("신규 회원 로그인 성공");
 			JSONObject res_data = new JSONObject(result_data);
-			logger.info("data : " + res_data.get("resultdata"));
-			JSONObject ACCESS_TOKEN = new JSONObject(res_data.get("resultdata").toString());
+			logger.info("data : " + res_data.get("data"));
+			JSONObject ACCESS_TOKEN = new JSONObject(res_data.get("data").toString());
 			logger.info("access : " + ACCESS_TOKEN.get("access_token").toString());
 
 			response.addHeader("Authorization", ACCESS_TOKEN.get("access_token").toString());
+		    ResponseCookie refreshTokenCookie = ResponseCookie.from("refresh_token", ACCESS_TOKEN.get("refresh_token").toString())
+		            .httpOnly(false)
+		            .secure(false) // HTTPS 환경에서만 사용할 경우
+		            .path("/")
+		            .maxAge(30 * 24 * 60 * 60) // 30일
+		            .sameSite("Strict") // 또는 "Lax"
+		            .build();
+
+		    response.addHeader("Set-Cookie", refreshTokenCookie.toString());
 
 			return ResponseEntity.status(HttpStatus.CREATED).body(result_data);
 		}
 		
-		if(result_data.get("resultcode").equals(301)) {
+		else if(result_data.get("code").equals(301)) {
 			logger.info("카카오 게정 연동");
 			return ResponseEntity.status(HttpStatus.MOVED_PERMANENTLY).body(result_data);
 		}
-		if (result_data.get("resultcode").equals(200)) {
-			logger.info("기존 회원 로그인 성공");
+		if(result_data.get("code").equals(200) && result_data.get("Customcode").equals("01")) {
+			JSONObject res_data = new JSONObject(result_data);
+			logger.info("data : " + res_data.get("data"));
+			JSONObject ACCESS_TOKEN = new JSONObject(res_data.get("data").toString());
+			logger.info("access : " + ACCESS_TOKEN.get("access_token").toString());
 
+			response.addHeader("Authorization", ACCESS_TOKEN.get("access_token").toString());
+		    // ✅ refresh_token을 HttpOnly 쿠키로 설정
+		    ResponseCookie refreshTokenCookie = ResponseCookie.from("refresh_token", ACCESS_TOKEN.get("refresh_token").toString())
+		            .httpOnly(false)
+		            .secure(false) // HTTPS 환경에서만 사용할 경우
+		            .path("/")
+		            .maxAge(30 * 24 * 60 * 60) // 30일
+		            .sameSite("Strict") // 또는 "Lax"
+		            .build();
+
+		    response.addHeader("Set-Cookie", refreshTokenCookie.toString());
+
+			return ResponseEntity.status(HttpStatus.OK).body(result_data);
+			
 		}
 
 		return ResponseEntity.status(HttpStatus.OK).body(result_data);

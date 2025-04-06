@@ -100,9 +100,9 @@ public class Kakao_Certification {
 		data.put("id", infos.get("id"));
 		data.put("exp" , token_infos.get("exp"));
 		logger.info("data :" + data);
-	    result_data.put("resultcode", 200);
-	    result_data.put("resultmsg", "카카오 계정 생성");
-	    result_data.put("resultdata", data);
+	    result_data.put("code", 200);
+	    result_data.put("msg", "카카오 계정 생성");
+	    result_data.put("data", data);
 	    
 		return result_data;
 		
@@ -179,7 +179,7 @@ public class Kakao_Certification {
 			//todu:저장된 사용자 데이터 가져오기
 			
 			Map<String , Object> user_data = new HashMap<String,Object>();
-			user_data = mapper.user_info(user_infos.get("id").toString());
+			user_data = mapper.Kakao_user_info(user_infos.get("id").toString());
 			logger.info("정보 조회 결과 :" + user_data);
 			
 			if(user_data  == null) {
@@ -193,102 +193,72 @@ public class Kakao_Certification {
 				response_data.put("thumbnail_img", "null");
 				logger.info("데이터 : " + response_data);
 				
-				result_data.put("resultdata", response_data);
-				result_data.put("resultmsg", "id is not found");
-				result_data.put("resultcode", 400);
+				result_data.put("data", response_data);
+				result_data.put("msg", "id is not found");
+				result_data.put("code", 400);
 				
 				return result_data;
 			}
 			
 			Map<String ,Object> token_data = new HashMap<String, Object>();
 			String auth = "";
-			auth = tokens.getHeader("Authorization").toString();
-			logger.info("cookies : " + auth);
-			boolean exp_check = false;
-			exp_check = token.exp_validateToken(auth);
-			logger.info("토큰 체크 : " + exp_check);
-			String new_access = "";
-			
-			if(exp_check == false) {
-				logger.info("토큰 재발급");
-				//TODU: redis에서 id값으로 key값 비교후 값이 존재하면 엑세스 토큰 발급
-				String refresh_check ="";
-				refresh_check =redis.check_refresh(user_data.get("id").toString()); 
-				logger.info("refresh 토큰 데이터 유무 확인 : " + refresh_check);
-				if(refresh_check==null) {
-					logger.error("id로 조회한 refresh 토큰이 존재하지 않습니다 모두 재발급 필요");
-					if(user_data!= null) {
-						logger.info("사용자 정보 조회 정상 모든 토큰 재발급");
-						Map<String, Object> re_token = new HashMap<String, Object>();
-						re_token = token.CreateToken(user_data.get("id").toString());
-						
-		                response_data.put("uuid", user_data.get("connectid").toString());
-		                response_data.put("id", user_data.get("id").toString());
-		                response_data.put("email", user_infos.get("email").toString());
-		                response_data.put("nickname", user_data.get("nickname").toString());
-		                response_data.put("gender", user_data.get("gender").toString());
-		                response_data.put("profile_img", user_data.get("profile_img").toString());
-		                response_data.put("thumbnail_img", user_data.get("thumnail_img").toString());
-		                response_data.put("exp", re_token.get("exp"));
-		                response_data.put("access_token", re_token.get("access_token").toString());
-		                logger.info("데이터 : " + response_data);
-		                
-						result_data.put("resultdata", response_data);
-						result_data.put("resultmsg", "success");
-						result_data.put("resultcode", 201);
-						return result_data;
-					}
-					else {
-						logger.error("정보를 알수 없는 사람입니다 접근 금지");
-						result_data.put("resultdata", "null");
-						result_data.put("resultmsg", "false");
-						result_data.put("resultcode", 401);
-						return result_data;
-					}
-				}
-				new_access = token.on_access(user_data.get("id").toString());
-				logger.info("토큰 새로 생성 : " + new_access);
-                token_data = token.kakao_validtoken(new_access);
+			auth = tokens.getHeader("Authorization");
+			if(auth == null) {
+				logger.info("모든 토큰을 생성해야 한다.");
+				Map<String, Object> login_info = new HashMap<String, Object>();
+				login_info = token.CreateToken(user_infos.get("id").toString());
+				logger.info("토큰 정보 : "+ login_info);
+                token_data = token.kakao_validtoken(login_info.get("access_token").toString());
                 
-                response_data.put("uuid", user_data.get("connectid").toString());
-                response_data.put("id", user_data.get("id").toString());
-                response_data.put("email", user_infos.get("email").toString());
-                response_data.put("nickname", user_data.get("nickname").toString());
-                response_data.put("gender", user_data.get("gender").toString());
-                response_data.put("profile_img", user_data.get("profile_img").toString());
-                response_data.put("thumbnail_img", user_data.get("thumnail_img").toString());
-                response_data.put("exp", token_data.get("exp"));
-                response_data.put("access_token", new_access.toString());
-                logger.info("데이터 : " + response_data);
+                login_info.put("uuid", user_data.get("connectid").toString());
+                login_info.put("username", user_data.get("username").toString());
+                login_info.put("id", user_data.get("id").toString());
+                login_info.put("email", user_infos.get("email").toString());
+                login_info.put("nickname", user_data.get("nickname").toString());
+                login_info.put("profile_img", user_data.get("profile_img").toString());
+                login_info.put("exp", token_data.get("exp"));
                 
-				result_data.put("resultdata", response_data);
-				result_data.put("resultmsg", "login success");
-				result_data.put("resultcode", 201);
-				
+                result_data.put("data", login_info);
+                result_data.put("msg", "login success");
+                result_data.put("code", 200);
+                result_data.put("Customcode", "01");
 				
 				return result_data;
 			}
 			else {
-                logger.info("토큰 시간 유효");
-                
-                token_data = token.kakao_validtoken(auth);
-                
-                response_data.put("uuid", user_data.get("connectid").toString());
-                response_data.put("id", user_data.get("id").toString());
-                response_data.put("email", user_infos.get("email").toString());
-                response_data.put("nickname", user_data.get("nickname").toString());
-                response_data.put("gender", user_data.get("gender").toString());
-                response_data.put("profile_img", user_data.get("profile_img").toString());
-                response_data.put("thumbnail_img", user_data.get("thumnail_img").toString());
-                response_data.put("exp", token_data.get("exp"));
-                logger.info("데이터 : " + response_data);
-                
-                result_data.put("resultmsg", "login success");
-                result_data.put("resultdata", response_data);
-				result_data.put("resultcode", 200);
-				return result_data;
+				logger.info("기존 로그인 진행");
+				auth = tokens.getHeader("Authorization").toString();
+				boolean exp_check = false;
+				exp_check = token.exp_validateToken(auth);
+				logger.info("토큰 체크 : " + exp_check);
+				if(exp_check == false) {//토큰 값이 유효하지 않으면 프론트로 다시 요청보내서 refreshtoken을 받아서 redis의 값이랑 비교
+					logger.info("토큰 시간 만료");
+					result_data.put("code", 401);
+					result_data.put("errorcode", "01");
+					result_data.put("msg", "토큰 시간 만료");
+					result_data.put("data", "null");
+					
+					return result_data;
+					
+				}
+				else {
+					token_data = token.kakao_validtoken(auth);
+	                response_data.put("uuid", user_data.get("connectid").toString());
+	                response_data.put("username", user_data.get("username").toString());
+	                response_data.put("id", user_data.get("id").toString());
+	                response_data.put("email", user_infos.get("email").toString());
+	                response_data.put("nickname", user_data.get("nickname").toString());
+	                response_data.put("profile_img", user_data.get("profile_img").toString());
+	                response_data.put("exp", token_data.get("exp"));
+	                logger.info("데이터 : " + response_data);
+	                
+	                result_data.put("msg", "login success");
+	                result_data.put("data", response_data);
+	                result_data.put("code", 200);
+	                result_data.put("Customcode", "00");
+					return result_data;
+				}
 			}
-
 		}
 		else {
 			logger.info("신규 사용자 ");
@@ -319,6 +289,7 @@ public class Kakao_Certification {
 			token_infos = token.CreateToken(user_infos.get("id").toString());
 			logger.info("토큰 정보 : "+ token_infos);
 
+			response_data.put("refresh_token", token_infos.get("refresh_token").toString());
 			response_data.put("access_token", token_infos.get("access_token").toString());
 			response_data.put("id", user_infos.get("id"));
 			response_data.put("nickname", properties.get("nickname").toString());
@@ -328,9 +299,9 @@ public class Kakao_Certification {
 			response_data.put("uuid", uuid);
 			
 			
-			result_data.put("resultdata", response_data);
-			result_data.put("resultmsg", "login success");
-			result_data.put("resultcode", 201);
+			result_data.put("data", response_data);
+			result_data.put("msg", "login success");
+			result_data.put("code", 201);
 			
 			return result_data;
 		    }
@@ -351,9 +322,9 @@ public class Kakao_Certification {
 			    kakao.put("thumbnail_img", properties.get("thumbnail_image").toString());
 			    
 			    data.put("kakao_info", kakao);
-				result_data.put("resultdata", user_infos.get("id"));
-				result_data.put("resultmsg", "카카오 계정 연동 여부 확인");
-				result_data.put("resultcode", 201);
+				result_data.put("data", user_infos.get("id"));
+				result_data.put("msg", "카카오 계정 연동 여부 확인");
+				result_data.put("code", 201);
 				
 				return result_data;
 		    }
@@ -363,9 +334,9 @@ public class Kakao_Certification {
 		}
 		else if(respondatas.getStatusCodeValue() == 401) {
 			logger.error("인증코드값이 존재하지 않습니다");
-			result_data.put("resultcode", 401);
-			result_data.put("resultmsg", "code is not foud");
-			result_data.put("resultdata","null");
+			result_data.put("code", 401);
+			result_data.put("msg", "code is not foud");
+			result_data.put("data","null");
 	   
 
 			
@@ -380,7 +351,7 @@ public class Kakao_Certification {
 		logger.info("카카오 id db조회");
 		boolean id_check =false;
 		
-		id_check =mapper.Check_id(info);
+		id_check =mapper.Kakao_Check_id(info);
 		
 		return id_check;
 	}

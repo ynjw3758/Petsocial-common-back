@@ -34,6 +34,34 @@ public class Authorization_Controller {
 	@Autowired
 	private TokenProvider token;
 	
+	@PostMapping("/token/refresh")
+	public ResponseEntity<Map<String, Object>>refresh_vali(@RequestBody Map<String, Object> info){
+		Map<String, Object> result =new HashMap<>();
+		boolean refresh_check =false;
+		String tokens=info.get("refresh_token").toString();
+		String id=info.get("id").toString();
+		refresh_check = token.refresh_validate(tokens, id);
+		logger.info("리프레쉬 만료 시간 체크 결과 :" +refresh_check );
+		if(refresh_check == true) {
+			logger.info("리프레쉬 토큰 유효함 엑세스 토큰 ");
+			Map<String, Object>token_info = new HashMap<>();
+			token_info = token.create_access(id);
+			logger.info("생성된 access_token :" + token_info);
+			result.put("code", 200);
+			result.put("msg", "엑세스 토큰 재발급 성공");
+			result.put("data", token_info);
+			return ResponseEntity.status(HttpStatus.OK).body(result);
+			
+		}else {
+			result.put("code", 401);
+			result.put("msg", "다시 로그인 해야함");
+			result.put("data", "null");
+		}
+		
+		return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(result);
+		
+	}
+	
 	@GetMapping("/acccheck")
 	public ResponseEntity<Map<String , Object>> accesscheck(HttpServletRequest request){
 		ResponseEntity<Map<String, Object>> check_token;
@@ -54,10 +82,10 @@ public class Authorization_Controller {
 	@GetMapping("/valid-accesstoken")
 	public ResponseEntity<Map<String, Object>> validtoken(HttpServletRequest req, @RequestParam("id") String id) {
 		logger.info("헤더 auth 토큰 데이터 확인");
-		logger.info("token : " + req.getHeader("set-Cookies"));
+		logger.info("token : " + req.getHeader("Authorization"));
 		Map<String, Object> result_data = new HashMap<String, Object>();
-		result_data = token.ValidToken(req.getHeader("set-Cookies").toString(), id);
-		if (req.getHeader("set-Cookies").toString().equals("")) {
+		result_data = token.ValidToken(req.getHeader("Authorization").toString(), id);
+		if (req.getHeader("Authorization").toString().equals("")) {
 			logger.info("사용자 인증 실패 토큰이 존재하지 않습니다");
 			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
 		}

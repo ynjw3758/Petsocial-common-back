@@ -1,6 +1,8 @@
 package com.pets.platform.certification;
 
 import java.net.URI;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -22,7 +24,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pets.platform.Service.UserInfo_Service;
 import com.pets.platform.exception.RestemplateExceptionHandler;
+import com.pets.platform.jwt.TokenProvider;
 import com.pets.platform.mapper.User_Mapper;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -47,6 +51,12 @@ public class Naver_Certification {
 	
 	@Autowired
 	private User_Mapper mapper;
+	
+	@Autowired
+	private UserInfo_Service info;
+	
+	@Autowired
+	private TokenProvider token_info;
 	
 	public Map<String, Object> Naver_Login(String code , HttpServletRequest tokens ,String state){
 		logger.info("code :" + code);
@@ -75,7 +85,7 @@ public class Naver_Certification {
 			
 			try {
 				json = new ObjectMapper().readValue(respondatas.getBody().toString(), Map.class);
-				logger.info("카카오 사용자 정보 조회: " + json);
+				logger.info("네이버 사용자 정보 조회: " + json);
 			} catch (JsonMappingException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -84,9 +94,9 @@ public class Naver_Certification {
 				e.printStackTrace();
 			}
 			String access_token = json.get("access_token").toString();
-			User_info = GetUser_info(access_token);
-			
-			
+			User_info = GetUser_info(access_token ,tokens);
+			logger.info("결과 :" + User_info);
+			result =User_info; 
 		}
 		else {
 			logger.error("요청 값이 이상한 경우");
@@ -100,9 +110,10 @@ public class Naver_Certification {
 		
 	}
 	
-	public Map<String ,Object> GetUser_info(String token){
+	public Map<String ,Object> GetUser_info(String token, HttpServletRequest headers){
 		
 		Map<String ,Object> data = new HashMap<String, Object>();
+		Map<String ,Object> response_data = new HashMap<String, Object>();
 		String apiurl="https://openapi.naver.com/";
 		String path = "v1/nid/me";
 		URI url = null;
@@ -131,11 +142,189 @@ public class Naver_Certification {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		logger.info("정보 :" + user_info);
+		Map<String ,Object> user_infos =(Map<String, Object>) user_info.get("response"); 
+		logger.info("정보 :" +user_infos);
+		boolean user_check = false;
+		user_check = mapper.Naver_Check_id(user_infos.get("id").toString());
+		if(user_check == true) {
+			logger.info("기존 사용자");
+			Map<String , Object> user_data = new HashMap<String,Object>();
+			user_data = mapper.Naver_user_info(user_infos.get("id").toString());
+			logger.info("정보 조회 결과 :" + user_data);
+			if(user_data  == null) {
+				logger.error("사용자 id가 존재하지 않습니다 ");
+				response_data.put("uuid", "null");
+				response_data.put("id", "null");
+				response_data.put("email", "null");
+				response_data.put("nickname", "null");
+				response_data.put("gender", "null");
+				response_data.put("profile_img", "null");
+				response_data.put("thumbnail_img", "null");
+				logger.info("데이터 : " + response_data);
+				
+				data.put("data", response_data);
+				data.put("msg", "id is not found");
+				data.put("code", 400);
+				
+				return data;
+			}
+			//TODO:토큰 인증
+			Map<String ,Object> token_data = new HashMap<String, Object>();
+			String auth = "";
+			auth = headers.getHeader("Authorization");
+			if(auth == null) {
+				logger.info("모든 토큰을 생성해야 한다.");
+				Map<String, Object> login_info = new HashMap<String, Object>();
+				login_info = token_info.CreateToken(user_infos.get("id").toString());
+				logger.info("토큰 정보 : "+ login_info);
+                token_data = token_info.kakao_validtoken(login_info.get("access_token").toString());
+                
+                login_info.put("uuid", user_data.get("connectid").toString());
+                login_info.put("username", user_data.get("username").toString());
+                login_info.put("id", user_data.get("id").toString());
+                login_info.put("email", user_infos.get("email").toString());
+                login_info.put("nickname", user_data.get("nickname").toString());
+                login_info.put("profile_img", user_data.get("profile_img").toString());
+                login_info.put("exp", token_data.get("exp"));
+                
+				data.put("data", login_info);
+				data.put("msg", "login success");
+				data.put("code", 200);
+				data.put("Customcode", "01");
+				
+				return data;
+			}
+			else {
+				logger.info("기존 로그인 진행");
+				auth = headers.getHeader("Authorization").toString();
+				boolean exp_check = false;
+				exp_check = token_info.exp_validateToken(auth);
+				logger.info("토큰 체크 : " + exp_check);
+				if(exp_check == false) {//토큰 값이 유효하지 않으면 프론트로 다시 요청보내서 refreshtoken을 받아서 redis의 값이랑 비교
+					logger.info("토큰 시간 만료");
+					data.put("code", 401);
+					data.put("errorcode", "01");
+					data.put("msg", "토큰 시간 만료");
+					data.put("data", "null");
+					
+					return data;
+					
+				}
+				else {//토큰값 유효함
+	                token_data = token_info.kakao_validtoken(auth);
+	                
+	                response_data.put("uuid", user_data.get("connectid").toString());
+	                response_data.put("username", user_data.get("username").toString());
+	                response_data.put("id", user_data.get("id").toString());
+	                response_data.put("email", user_infos.get("email").toString());
+	                response_data.put("nickname", user_data.get("nickname").toString());
+	                response_data.put("profile_img", user_data.get("profile_img").toString());
+	                response_data.put("exp", token_data.get("exp"));
+	                logger.info("데이터 : " + response_data);
+	                
+	                data.put("msg", "login success");
+	                data.put("data", response_data);
+					data.put("code", 200);
+					data.put("Customcode", "00");
+					return data;
+				}
+			}
+
+			
+		}
+		else {
+			logger.info("신규 사용자");
+		    Boolean email_check =false;
+		    email_check = mapper.Search_email(user_infos.get("email").toString());
+		    logger.info("이메일 조회 :" +email_check);
+		    
+		    if(email_check == false) {
+		    Map<String, Object> insert_info = new HashMap<String ,Object>();
+		    Map<String ,Object> token_infos = new HashMap<String ,Object>();
+            logger.info("네이버 계정으로 아이디 생성");
+		    logger.info("네이버 정보 : " + user_infos);
+		    
+		    String uuid="";
+		    uuid = info.uuid();
+			Date date = new Date();
+			SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+			String Create_date = sdf.format(date);
+			
+		    insert_info.put("uuid", uuid);
+		    insert_info.put("id", user_infos.get("id"));
+		    insert_info.put("email", user_infos.get("email").toString());
+		    insert_info.put("nickname", user_infos.get("nickname").toString());
+		    insert_info.put("name", user_infos.get("name").toString());
+		    insert_info.put("gender", user_infos.get("gender").toString());
+		    insert_info.put("profile_img", user_infos.get("profile_image").toString());
+		    insert_info.put("createdate",Create_date);
+		    insert_info.put("mobile",user_infos.get("mobile").toString());
+		    insert_info.put("social_type","naver");
+		    
+			mapper.naver_insert(insert_info);
+			
+			token_infos = token_info.CreateToken(user_infos.get("id").toString());
+			logger.info("토큰 정보 : "+ token_infos);
+			
+			response_data.put("refresh_token", token_infos.get("refresh_token").toString());
+			response_data.put("access_token", token_infos.get("access_token").toString());
+			response_data.put("id", user_infos.get("id"));
+			//response_data.put("nickname", properties.get("nickname").toString());
+			response_data.put("profile_img", user_infos.get("profile_image").toString());
+			response_data.put("exp", token_infos.get("exp"));
+			response_data.put("uuid", uuid);
+			
+			
+			data.put("data", response_data);
+			data.put("msg", "login success");
+			data.put("code", 201);
+			
+			return data;
+		    }
+		    else {
+		    	logger.info("네이버 등록된 이메일과 같은 메일 존재");
+		    	Map<String, Object> naver_data = new HashMap<String ,Object>();
+		    	Map<String, Object> naver = new HashMap<String ,Object>();
+		    	data= mapper.Kakao_Search_id(user_infos.get("email").toString());
+			    
+			    naver.put("id", user_infos.get("id"));
+			    naver.put("email", user_infos.get("email").toString());
+			    //naver.put("nickname", user_infos.get("nickname").toString());
+			    naver.put("gender", user_infos.get("gender").toString());
+			    naver.put("profile_img", user_infos.get("profile_image").toString());
+			    
+			    naver_data.put("naver_info", naver);
+				data.put("data", user_infos.get("id"));
+				data.put("msg", "네이버와 같은 이메일 존재");
+				data.put("code", 201);
+				
+				return data;
+		    }
+			
+		}
+		
+		
+		}
+		else {
+			logger.error("엑세스 토큰값 이상");
+			data.put("code", 401);
+			data.put("errorcode", "00");
+			data.put("msg", "네이버 코드 및 stat값 이상");
+			data.put("data", "null");
+			
 		}
 		
 				
 	 return data;	
+	}
+	
+	public boolean user_check(String info) {
+		logger.info("카카오 id db조회");
+		boolean id_check =false;
+		
+		id_check =mapper.Check_id(info);
+		
+		return id_check;
 	}
 
 }

@@ -3,6 +3,9 @@
 	<item key="hasShownOverlayPopupBefore" value="true"/>
 	<item key="replaceBarOpen" value="false"/>
 	<list key="searchhistory">
+		<item value="exist"/>
+		<item value="COALESCE"/>
+		<item value="user_info"/>
 		<item value="refresh-main"/>
 		<item value="re"/>
 		<item value="remain"/>

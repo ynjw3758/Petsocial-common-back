@@ -1,0 +1,204 @@
+package com.pets.platform.jwt;
+import java.time.Duration;
+import java.util.Base64;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+import io.jsonwebtoken.UnsupportedJwtException;
+import jakarta.servlet.http.HttpServletRequest;
+import io.jsonwebtoken.ExpiredJwtException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseCookie.ResponseCookieBuilder;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+
+import com.pets.platform.redis.Redis_Service;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Header;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.SignatureAlgorithm;
+
+@Service
+public class TokenProvider {
+	
+	private Logger logger = LoggerFactory.getLogger(this.getClass());
+	
+	   @Value("${jwt.security.key}")
+	    private String secretKey;
+	    int life_time  = 1000*60*24;
+	    
+	    @Autowired
+	     private Redis_Service Redis;
+	    
+	    public Map<String ,Object> create_access(String id) {
+			   Date create_time =new Date();
+			   Date expiration =  new Date(create_time.getTime() + Duration.ofDays(1).toMillis());
+			   long finish_time = 1000*60*10*6;
+			   Map<String, Object> data= new HashMap<>();
+			   Map<String , Object> payload_info = new HashMap<String, Object>();
+			   
+	           String access_Token = "";
+	           access_Token = Jwts.builder()
+		                .setHeaderParam(Header.TYPE, Header.JWT_TYPE) // (1)
+		                .claim("userid", id)
+		                .setIssuer(id) // 토큰발급자(iss)
+		                .setIssuedAt(create_time) // 발급시간(iat)
+		                .setExpiration(new Date(create_time.getTime()+finish_time))
+		                .setSubject(id) //  토큰 제목(subject)
+		                .signWith(SignatureAlgorithm.HS256, Base64.getEncoder().encodeToString(secretKey.getBytes())) // 알고리즘, 시크릿 키
+		                .compact();
+	           
+	           payload_info = Jwts.parser().setSigningKey(secretKey.getBytes()).parseClaimsJws(access_Token).getBody();
+	           data.put("access_token", access_Token);
+	           data.put("exp", payload_info.get("exp").toString());
+	    	
+	    	return data;
+	    }
+
+	    
+	    //access_token만 생성
+	    public String on_access(String id) {
+			   Date create_time =new Date();
+			   Date expiration =  new Date(create_time.getTime() + Duration.ofDays(1).toMillis());
+			   long finish_time = 1000*60*10*6;
+			   
+	           String access_Token = "";
+	           access_Token = Jwts.builder()
+		                .setHeaderParam(Header.TYPE, Header.JWT_TYPE) // (1)
+		                .claim("userid", id)
+		                .setIssuer(id) // 토큰발급자(iss)
+		                .setIssuedAt(create_time) // 발급시간(iat)
+		                .setExpiration(new Date(create_time.getTime()+finish_time))
+		                .setSubject(id) //  토큰 제목(subject)
+		                .signWith(SignatureAlgorithm.HS256, Base64.getEncoder().encodeToString(secretKey.getBytes())) // 알고리즘, 시크릿 키
+		                .compact();
+	    	
+	    	return access_Token;
+	    }
+	   
+	    //최초 access_token, refresh_token  생성
+	   public Map<String, Object> CreateToken(String id) {
+		   logger.info("로그인 요청 후 토큰 생성");
+		   Date create_time =new Date();
+		   Date expiration =  new Date(create_time.getTime() + Duration.ofDays(1).toMillis());
+		   long time = 1000*60*24;
+		   long finish_time = 1000*60/*60*/;
+		   long refresh_time=1000*60*60*24;
+		   Map<String, Object> tokeninfo = new HashMap<String, Object>();
+		   
+        String access_Token = "";
+        access_Token = Jwts.builder()
+	                .setHeaderParam(Header.TYPE, Header.JWT_TYPE) // (1)
+	                .claim("userid", id)
+	                .setIssuer(id) // 토큰발급자(iss)
+	                .setIssuedAt(create_time) // 발급시간(iat)
+	                .setExpiration(new Date(create_time.getTime()+finish_time))
+	                .setSubject("access-token") //  토큰 제목(subject)
+	                .signWith(SignatureAlgorithm.HS256, Base64.getEncoder().encodeToString(secretKey.getBytes())) // 알고리즘, 시크릿 키
+	                .compact();
+        
+        String refresh_Token="";
+        refresh_Token=Jwts.builder()
+     		   .claim("userid", id)
+	                .setExpiration(new Date(create_time.getTime()+refresh_time))
+	                .setSubject("refresh-token")
+	                .signWith(SignatureAlgorithm.HS256, Base64.getEncoder().encodeToString(secretKey.getBytes())) // 알고리즘, 시크릿 키
+	                .compact();
+        tokeninfo.put("access_token", access_Token);
+        tokeninfo.put("refresh_token", refresh_Token);
+        Map<String , Object> payload_info = new HashMap<String, Object>();
+        
+        payload_info = Jwts.parser().setSigningKey(secretKey.getBytes()).parseClaimsJws(access_Token).getBody();
+        logger.info("페이로드 복호화 결과 : " + payload_info.get("exp").toString());
+
+        Redis.setrefresh(id, refresh_Token, refresh_time);
+
+        tokeninfo.put("exp", payload_info.get("exp").toString());
+        logger.info("토큰 : " + tokeninfo);
+	        return tokeninfo;
+		   
+	   }
+     //회원 정보 가져오기
+	   public Map<String ,Object> kakao_validtoken(String token) {
+		   logger.info("카카오 회원 정보 가져오기");
+		   logger.info("jwt : " + token);
+		   return Jwts.parser().setSigningKey(secretKey.getBytes()).parseClaimsJws(token).getBody(); 
+	   }
+	   //카카오 회원 access_token 만료 시간 체크
+	   public boolean exp_validateToken(String token) {
+		   logger.info("토큰 만료 시간 체크");
+	        try {
+	            Jwts.parser().setSigningKey(secretKey.getBytes()).parseClaimsJws(token);
+	            return true;
+	        
+	        } catch(ExpiredJwtException e) {
+	            logger.error("엑세스 토큰 시간이 만료되었습니다");
+	            return false;
+	        }
+	    }
+	   public boolean refresh_validate(String token, String id) {
+		   logger.info("refresh_token 체크");
+	        try {
+	            Jwts.parser().setSigningKey(secretKey.getBytes()).parseClaimsJws(token);
+	            return true;
+	        
+	        } catch(ExpiredJwtException e) {
+	            logger.error("refresh_token 시간이 만료되었습니다");
+	            Redis.Delete_Refresh_token(id);
+	            return false;
+	        }
+	    }  
+	   
+	   //엑세스 토큰 조회 통합 메소드 
+	   public ResponseEntity<Map<String ,Object>> access_check(HttpServletRequest request) {
+			boolean success= false;
+			boolean exp_check= false;
+			Map<String, Object> result = new HashMap<String, Object>();
+			
+			String access_token="";
+			access_token =request.getHeader("Authorization").toString(); 
+			logger.info("access_token :" + access_token);
+			exp_check =exp_validateToken(access_token);
+			logger.info("토큰 만료 시간 :" + exp_check);
+			
+			if(exp_check == false) {	
+				logger.info("토큰 시간 만료");
+				result.put("resultcode", 401);
+				result.put("resultmsg", "token is finished");
+				return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(result);
+			}
+			result.put("resultcode", 200);
+			result.put("resultmsg", "token is valide");
+			
+			return ResponseEntity.status(HttpStatus.OK).body(result);
+		}
+
+	   //access_token 조회
+	   public Map<String , Object>  ValidToken(String Token , String id){
+		   Map<String , Object> result_data = new HashMap<String, Object>();
+		   Map<String , Object> payload_info = new HashMap<String, Object>();
+		   logger.info("사용자id :" + id + " , " + "token :" + Token);
+		   payload_info = Jwts.parser().setSigningKey(secretKey.getBytes()).parseClaimsJws(Token).getBody();
+		   if(payload_info.get("userid").toString().equals(id)) {
+			   logger.info("payload 인증 완료");
+			   result_data.put("resultcode", 200);
+			   result_data.put("id", id);
+		   }
+		   
+		   else {
+			   result_data.put("resultcode",403);
+			   result_data.put("id", id);
+		   }
+		   return result_data;
+		   
+	   }
+
+}

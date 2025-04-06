@@ -13,10 +13,21 @@ public interface User_Mapper {
 	/*-------회원 가입 db저장-----*/
 	public void Sign_insert(Map<String, Object> userinfo);
 	
+	/*------로그인 종류에서 id값 체크-----*/
+	public boolean Check_id(String id); //일반 로그인 체크
+	public boolean Kakao_Check_id(String id); //카카오 로그인 체크
+	public boolean Naver_Check_id(String id); //네이버 로그인 체크
+	
+	/*------네이버 로그인-------*/
+	public void naver_insert(Map<String , Object> info);
+	public Map<String ,Object> Naver_user_info(String id); //네이버 계정 정보 조회
+	
 	/*------카카오 로그인--------*/
 	public void kakao_insert(Map<String , Object> info);
-	public boolean Check_id(String id);
-	public Map<String ,Object> user_info(String id);
+	public Map<String ,Object> Kakao_user_info(String id); //카카오 계정 정보 조회
+	
+	/*-------일반 로그인--------*/
+	public Map<String ,Object> user_info(String id); //일반 계정 정보 조회
 	
 	/*-----닉네임 중복 , 중복 아이디 ,핸드폰 인증 확인------*/
 	public boolean Search_Nickname(String Nickname);
